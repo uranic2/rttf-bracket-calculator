@@ -48,6 +48,10 @@ input[type=checkbox] { width: 18px; height: 18px; margin: 0; accent-color: var(-
 .result p { margin: 4px 0 0; color: var(--subtle); font-size: .91rem; }
 .result .number { display: block; margin-top: 14px; color: var(--teal); font-size: clamp(2.1rem, 4.6vw, 3.8rem); line-height: 1.1; font-weight: 790; letter-spacing: -.045em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .unit { margin: 8px 0 17px !important; }
+.result .result-duration { margin-top: 10px; }
+.result-duration output { color: var(--ink); font-weight: 750; font-variant-numeric: tabular-nums; }
+.duration-note { margin: 10px 2px 0; color: var(--subtle); font-size: .91rem; }
+.duration-note[hidden] { display: none; }
 .track { height: 6px; margin-bottom: 13px; overflow: hidden; border-radius: 20px; background: #eaf1ef; }
 .track span { display: block; width: 0; height: 100%; border-radius: 20px; background: var(--teal); }
 .result:nth-child(2) .track span { background: #495b90; }
@@ -169,8 +173,21 @@ button.bracket-side:hover { text-decoration-thickness: 2px; }
         <div class="select-wrap"><select id="stage" aria-describedby="stage-help"></select></div>
         <span id="stage-help" class="limit">Раунд, с которого включается длинная схема.</span>
       </div>
+      <div class="field">
+        <label for="tables">Количество столов</label>
+        <input id="tables" type="number" min="1" step="1" value="8" inputmode="numeric">
+      </div>
+      <div class="field">
+        <label for="match-minutes">Средняя длительность матча, мин</label>
+        <input id="match-minutes" type="number" min="1" step="1" value="20" inputmode="numeric">
+      </div>
+      <div class="field">
+        <label for="break-minutes">Перерыв между матчами, мин</label>
+        <input id="break-minutes" type="number" min="0" step="1" value="1" inputmode="numeric">
+      </div>
     </div>
     <p id="error" class="error" role="status" hidden></p>
+    <p id="duration-error" class="error" role="status" hidden></p>
     <div class="facts" aria-label="Первый круг">
       <span>Мест в сетке <b id="slots">—</b></span>
       <span>Проходов без игры <b id="byes">—</b></span>
@@ -178,7 +195,7 @@ button.bracket-side:hover { text-decoration-thickness: 2px; }
     </div>
   </section>
 
-  <section class="results" aria-label="Сравнение числа матчей" aria-live="polite">
+  <section class="results" aria-label="Сравнение числа матчей и длительности" aria-live="polite">
     <article class="result">
       <h2>Короткая сетка</h2>
       <p>Приложение 11</p>
@@ -186,6 +203,7 @@ button.bracket-side:hover { text-decoration-thickness: 2px; }
       <p class="unit">Матчей</p>
       <div class="track" aria-hidden="true"><span id="short-track"></span></div>
       <p id="short-reference"></p>
+      <p class="result-duration">Время турнира ≈ <output id="short-duration" for="size losses unlimited stage tables match-minutes break-minutes">—</output></p>
     </article>
     <article class="result">
       <h2>Длинная сетка</h2>
@@ -194,6 +212,7 @@ button.bracket-side:hover { text-decoration-thickness: 2px; }
       <p class="unit">Матчей</p>
       <div class="track" aria-hidden="true"><span id="long-track"></span></div>
       <p id="long-reference"></p>
+      <p class="result-duration">Время турнира ≈ <output id="long-duration" for="size losses unlimited stage tables match-minutes break-minutes">—</output></p>
     </article>
     <article class="result">
       <h2>Смешанная сетка</h2>
@@ -202,8 +221,12 @@ button.bracket-side:hover { text-decoration-thickness: 2px; }
       <p class="unit">Матчей</p>
       <div class="track" aria-hidden="true"><span id="mixed-track"></span></div>
       <p id="mixed-reference"></p>
+      <p class="result-duration">Время турнира ≈ <output id="mixed-duration" for="size losses unlimited stage tables match-minutes break-minutes">—</output></p>
     </article>
   </section>
+
+  <p id="duration-note" class="duration-note">Свободные столы занимают матчи, участники которых уже определились. Стол и участники готовы к следующей игре после перерыва. Отсчёт заканчивается с последним матчем.</p>
+  <p id="duration-limit" class="duration-note" role="status" hidden></p>
 
   <section id="bracket-panel" class="panel bracket" aria-labelledby="bracket-heading">
     <div class="bracket-heading">
@@ -519,6 +542,52 @@ function buildBracket(n, limit, t, variant) {
   const columnIndex = new Map(columns.map((old, index) => [old,index]));
   return matches.map(row => ({...row, column:columnIndex.get(row.column)}));
 }
+
+// With equal match lengths and a common turnaround, every table used at a
+// given start time becomes available again together. Advance by those intervals.
+function scheduleWaves(matches, tables) {
+  const pending = new Uint8Array(matches.length);
+  const successors = matches.map(() => []);
+  for (const [index, match] of matches.entries()) {
+    for (const side of match.sides) {
+      if (!side.id) continue;
+      pending[index]++;
+      successors[side.id - 1].push(index);
+    }
+  }
+
+  const depth = new Uint32Array(matches.length);
+  const ready = [[]];
+  let readyCount = 0;
+  for (let index = matches.length - 1; index >= 0; index--) {
+    const longest = 1 + Math.max(0, ...successors[index].map(next => depth[next]));
+    depth[index] = longest;
+    while (ready.length <= longest) ready.push([]);
+    if (pending[index] !== 0) continue;
+    ready[longest].push(index);
+    readyCount++;
+  }
+
+  let waves = 0;
+  while (readyCount > 0) {
+    const active = [];
+    // Prefer matches whose result is needed by a longer remaining chain.
+    for (let rank = ready.length - 1; rank > 0 && active.length < tables; rank--) {
+      const candidates = ready[rank];
+      while (candidates.length && active.length < tables) active.push(candidates.pop());
+    }
+    readyCount -= active.length;
+    for (const index of active) {
+      for (const next of successors[index]) {
+        if (--pending[next] !== 0) continue;
+        ready[depth[next]].push(next);
+        readyCount++;
+      }
+    }
+    waves++;
+  }
+  return BigInt(waves);
+}
 </script>
 <script>
 "use strict";
@@ -529,6 +598,13 @@ const pField = get("losses");
 const unlimited = get("unlimited");
 const stage = get("stage");
 const error = get("error");
+const tableField = get("tables");
+const matchField = get("match-minutes");
+const breakField = get("break-minutes");
+const durationError = get("duration-error");
+const durationNote = get("duration-note");
+const durationLimit = get("duration-limit");
+const MAX_TIMED_PLAYERS = 4096;
 const format = new Intl.NumberFormat("ru-RU");
 const variants = ["short", "long", "mixed"];
 const comparisonRows = Array.from({length: 61}, (_, index) => {
@@ -577,6 +653,46 @@ function updateComparison(selected, limit, t, validLimit) {
   }
 }
 
+function durationLabel(minutes) {
+  const hours = minutes / 60n;
+  const remainder = minutes % 60n;
+  if (hours === 0n) return format.format(remainder) + " мин";
+  return format.format(hours) + " ч" + (remainder ? " " + format.format(remainder) + " мин" : "");
+}
+
+function updateDurations(n, limit, t, counts) {
+  const tables = tableField.valueAsNumber;
+  const match = matchField.valueAsNumber;
+  const pause = breakField.valueAsNumber;
+  const allValid = [
+    [tableField, Number.isSafeInteger(tables) && tables >= 1],
+    [matchField, Number.isSafeInteger(match) && match >= 1],
+    [breakField, Number.isSafeInteger(pause) && pause >= 0]
+  ].map(([field, valid]) => {
+    field.setAttribute("aria-invalid", String(!valid));
+    return valid;
+  }).every(Boolean);
+  durationError.hidden = allValid;
+  durationError.textContent = allValid ? "" :
+    "Введите целые значения. Количество столов и длительность матча — от 1, перерыв — от 0.";
+  const overLimit = Boolean(counts) && tables > 1 && n > MAX_TIMED_PLAYERS;
+  durationNote.hidden = !allValid || !counts || overLimit;
+  durationLimit.hidden = !overLimit || !allValid;
+  durationLimit.textContent = overLimit && allValid ?
+    "Оценка для нескольких столов доступна до " + format.format(MAX_TIMED_PLAYERS) + " участников." : "";
+
+  for (const key of variants) {
+    const output = get(key + "-duration");
+    if (!counts || !allValid || overLimit) {
+      output.textContent = "—";
+      continue;
+    }
+    const waves = tables === 1 ? counts[key] : scheduleWaves(buildBracket(n, limit, t, key), tables);
+    const minutes = waves > 0n ? waves * BigInt(match) + (waves - 1n) * BigInt(pause) : 0n;
+    output.textContent = durationLabel(minutes);
+  }
+}
+
 function update() {
   const n = nField.valueAsNumber;
   const p = pField.valueAsNumber;
@@ -595,6 +711,7 @@ function update() {
   updateComparison(n, p, t, validP);
 
   if (!validN || !validP) {
+    updateDurations(0, 0, t, null);
     updateBracket(0, 0, t);
     for (const id of ["slots", "byes", "opening", ...variants]) get(id).textContent = "—";
     for (const key of variants) {
@@ -609,6 +726,7 @@ function update() {
   const limit = unlimited.checked ? fullLimit : Math.min(p, fullLimit);
   const result = calculate(count, limit, t);
   const full = calculate(count, fullLimit, t);
+  updateDurations(n, limit, t, result);
   updateBracket(n, limit, t);
   const total = variants.reduce((maximum, key) => result[key] > maximum ? result[key] : maximum, 0n);
 
@@ -627,6 +745,7 @@ function update() {
 
 nField.addEventListener("input", update);
 pField.addEventListener("input", update);
+for (const input of [tableField, matchField, breakField]) input.addEventListener("input", update);
 unlimited.addEventListener("change", update);
 stage.addEventListener("change", () => {
   preferredStage = Number(stage.value);
