@@ -49,7 +49,7 @@ input[type=checkbox] { width: 18px; height: 18px; margin: 0; accent-color: var(-
 .result .number { display: block; margin-top: 14px; color: var(--teal); font-size: clamp(2.1rem, 4.6vw, 3.8rem); line-height: 1.1; font-weight: 790; letter-spacing: -.045em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .unit { margin: 8px 0 17px !important; }
 .result .result-duration { margin-top: 10px; }
-.result-duration output { color: var(--ink); font-weight: 750; font-variant-numeric: tabular-nums; }
+.result-duration output, .result-wait output { color: var(--ink); font-weight: 750; font-variant-numeric: tabular-nums; }
 .duration-note { margin: 10px 2px 0; color: var(--subtle); font-size: .91rem; }
 .duration-note[hidden] { display: none; }
 .track { height: 6px; margin-bottom: 13px; overflow: hidden; border-radius: 20px; background: #eaf1ef; }
@@ -204,6 +204,8 @@ button.bracket-side:hover { text-decoration-thickness: 2px; }
       <div class="track" aria-hidden="true"><span id="short-track"></span></div>
       <p id="short-reference"></p>
       <p class="result-duration">Время турнира ≈ <output id="short-duration" for="size losses unlimited stage tables match-minutes break-minutes">—</output></p>
+      <p class="result-wait">Простой столов ≈ <output id="short-wait" for="size losses unlimited stage tables match-minutes break-minutes">—</output></p>
+      <p class="result-wait">Ожидание участников ≈ <output id="short-participant-wait" for="size losses unlimited stage tables match-minutes break-minutes">—</output></p>
     </article>
     <article class="result">
       <h2>Длинная сетка</h2>
@@ -213,6 +215,8 @@ button.bracket-side:hover { text-decoration-thickness: 2px; }
       <div class="track" aria-hidden="true"><span id="long-track"></span></div>
       <p id="long-reference"></p>
       <p class="result-duration">Время турнира ≈ <output id="long-duration" for="size losses unlimited stage tables match-minutes break-minutes">—</output></p>
+      <p class="result-wait">Простой столов ≈ <output id="long-wait" for="size losses unlimited stage tables match-minutes break-minutes">—</output></p>
+      <p class="result-wait">Ожидание участников ≈ <output id="long-participant-wait" for="size losses unlimited stage tables match-minutes break-minutes">—</output></p>
     </article>
     <article class="result">
       <h2>Смешанная сетка</h2>
@@ -222,10 +226,14 @@ button.bracket-side:hover { text-decoration-thickness: 2px; }
       <div class="track" aria-hidden="true"><span id="mixed-track"></span></div>
       <p id="mixed-reference"></p>
       <p class="result-duration">Время турнира ≈ <output id="mixed-duration" for="size losses unlimited stage tables match-minutes break-minutes">—</output></p>
+      <p class="result-wait">Простой столов ≈ <output id="mixed-wait" for="size losses unlimited stage tables match-minutes break-minutes">—</output></p>
+      <p class="result-wait">Ожидание участников ≈ <output id="mixed-participant-wait" for="size losses unlimited stage tables match-minutes break-minutes">—</output></p>
     </article>
   </section>
 
   <p id="duration-note" class="duration-note">Свободные столы занимают матчи, участники которых уже определились. Стол и участники готовы к следующей игре после перерыва. Отсчёт заканчивается с последним матчем.</p>
+  <p id="waiting-note" class="duration-note">Простой суммируется по свободным столам, пока ещё есть неначатые матчи и их участники играют или отдыхают. Перерыв на столе после игры в простой не входит.</p>
+  <p id="participant-wait-note" class="duration-note">Ожидание участников суммируется с начала турнира до первой игры и между матчами каждого участника, включая перерывы. Отсчёт для каждого участника заканчивается с его последним матчем. В парной сетке ожидание считается на пару.</p>
   <p id="duration-limit" class="duration-note" role="status" hidden></p>
 
   <section id="bracket-panel" class="panel bracket" aria-labelledby="bracket-heading">
@@ -545,7 +553,7 @@ function buildBracket(n, limit, t, variant) {
 
 // With equal match lengths and a common turnaround, every table used at a
 // given start time becomes available again together. Advance by those intervals.
-function scheduleWaves(matches, tables) {
+function simulateSchedule(matches, tables) {
   const pending = new Uint8Array(matches.length);
   const successors = matches.map(() => []);
   for (const [index, match] of matches.entries()) {
@@ -568,7 +576,12 @@ function scheduleWaves(matches, tables) {
     readyCount++;
   }
 
-  let waves = 0;
+  const startWaves = new Array(matches.length);
+  let waves = 0n;
+  let waitingTableIntervals = 0n;
+  let participantWaitIntervals = 0n;
+  let participantBreaks = 0n;
+  let unstarted = matches.length;
   while (readyCount > 0) {
     const active = [];
     // Prefer matches whose result is needed by a longer remaining chain.
@@ -577,7 +590,20 @@ function scheduleWaves(matches, tables) {
       while (candidates.length && active.length < tables) active.push(candidates.pop());
     }
     readyCount -= active.length;
+    unstarted -= active.length;
+    // Empty tables wait until the next start only if fixtures still need players.
+    if (unstarted > 0) waitingTableIntervals += BigInt(tables - active.length);
     for (const index of active) {
+      startWaves[index] = waves;
+      for (const side of matches[index].sides) {
+        if (side.id) {
+          // From the end of the prior match: full idle intervals plus its break.
+          participantWaitIntervals += waves - startWaves[side.id - 1] - 1n;
+          participantBreaks++;
+        } else {
+          participantWaitIntervals += waves;
+        }
+      }
       for (const next of successors[index]) {
         if (--pending[next] !== 0) continue;
         ready[depth[next]].push(next);
@@ -586,7 +612,7 @@ function scheduleWaves(matches, tables) {
     }
     waves++;
   }
-  return BigInt(waves);
+  return {waves, waitingTableIntervals, participantWaitIntervals, participantBreaks};
 }
 </script>
 <script>
@@ -603,6 +629,8 @@ const matchField = get("match-minutes");
 const breakField = get("break-minutes");
 const durationError = get("duration-error");
 const durationNote = get("duration-note");
+const waitingNote = get("waiting-note");
+const participantWaitNote = get("participant-wait-note");
 const durationLimit = get("duration-limit");
 const MAX_TIMED_PLAYERS = 4096;
 const format = new Intl.NumberFormat("ru-RU");
@@ -675,21 +703,36 @@ function updateDurations(n, limit, t, counts) {
   durationError.hidden = allValid;
   durationError.textContent = allValid ? "" :
     "Введите целые значения. Количество столов и длительность матча — от 1, перерыв — от 0.";
-  const overLimit = Boolean(counts) && tables > 1 && n > MAX_TIMED_PLAYERS;
-  durationNote.hidden = !allValid || !counts || overLimit;
-  durationLimit.hidden = !overLimit || !allValid;
-  durationLimit.textContent = overLimit && allValid ?
-    "Оценка для нескольких столов доступна до " + format.format(MAX_TIMED_PLAYERS) + " участников." : "";
+  const withinLimit = n <= MAX_TIMED_PLAYERS;
+  const showEstimate = Boolean(counts) && allValid && (withinLimit || tables === 1);
+  durationNote.hidden = !showEstimate;
+  waitingNote.hidden = !showEstimate;
+  participantWaitNote.hidden = !showEstimate || !withinLimit;
+  durationLimit.hidden = !counts || !allValid || withinLimit;
+  const limitedEstimate = tables === 1 ? "Ожидание участников рассчитывается" :
+    "Оценка для нескольких столов доступна";
+  durationLimit.textContent = durationLimit.hidden ? "" :
+    limitedEstimate + " до " + format.format(MAX_TIMED_PLAYERS) + " участников.";
 
   for (const key of variants) {
-    const output = get(key + "-duration");
-    if (!counts || !allValid || overLimit) {
-      output.textContent = "—";
+    const duration = get(key + "-duration");
+    const wait = get(key + "-wait");
+    const participantWait = get(key + "-participant-wait");
+    if (!showEstimate) {
+      duration.textContent = "—";
+      wait.textContent = "—";
+      participantWait.textContent = "—";
       continue;
     }
-    const waves = tables === 1 ? counts[key] : scheduleWaves(buildBracket(n, limit, t, key), tables);
-    const minutes = waves > 0n ? waves * BigInt(match) + (waves - 1n) * BigInt(pause) : 0n;
-    output.textContent = durationLabel(minutes);
+    const schedule = withinLimit ? simulateSchedule(buildBracket(n, limit, t, key), tables) :
+      {waves: counts[key], waitingTableIntervals: 0n};
+    const breakMinutes = BigInt(pause);
+    const interval = BigInt(match) + breakMinutes;
+    const elapsed = schedule.waves > 0n ? schedule.waves * interval - breakMinutes : 0n;
+    duration.textContent = durationLabel(elapsed);
+    wait.textContent = durationLabel(schedule.waitingTableIntervals * interval);
+    participantWait.textContent = withinLimit ?
+      durationLabel(schedule.participantWaitIntervals * interval + schedule.participantBreaks * breakMinutes) : "—";
   }
 }
 
