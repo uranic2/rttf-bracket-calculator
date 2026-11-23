@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Расчёт числа матчей в короткой, длинной и смешанной турнирных сетках RTTF.">
+<title>Калькулятор турнирных сеток RTTF</title>
+<style>
+:root {
+  color-scheme: light;
+  --paper: #edf3f1; --sheet: #fff; --ink: #122a2f; --subtle: #405b60;
+  --dark: #102d34; --teal: #0c6657; --line: #cddcd8; --lime: #def47e;
+  --soft: #f3f8f6; --focus: #0b7664;
+  font-family: "Noto Sans", "Segoe UI", system-ui, sans-serif;
+  line-height: 1.55;
+}
+* { box-sizing: border-box; }
+body { margin: 0; color: var(--ink); background: var(--paper); }
+main { max-width: 1120px; margin: auto; padding: clamp(16px, 4vw, 48px) 22px; }
+.hero { position: relative; overflow: hidden; isolation: isolate; border-radius: 26px; color: white; background: var(--dark); padding: clamp(26px, 5vw, 55px); }
+.kicker { margin: 0 0 12px; color: var(--lime); font-size: .875rem; font-weight: 760; letter-spacing: .12em; text-transform: uppercase; }
+h1 { position: relative; margin: 0; max-width: 680px; font-size: clamp(2.35rem, 6vw, 4.35rem); line-height: 1.04; letter-spacing: -.055em; }
+.hero .intro { position: relative; max-width: 520px; margin: 19px 0 0; color: #daebe6; font-size: 1rem; }
+.lines { position: absolute; z-index: -1; inset: 0 0 0 auto; width: 38%; opacity: .56; background: repeating-linear-gradient(0deg, transparent 0 39px, #426c6a 40px 41px), repeating-linear-gradient(90deg, transparent 0 39px, #426c6a 40px 41px); mask-image: linear-gradient(90deg, transparent, black 52%); }
+.lines::before { content: ""; position: absolute; right: 13%; top: 11%; width: clamp(120px, 25vw, 290px); aspect-ratio: 1; border: 1px solid #91c9a8; border-radius: 50%; }
+.lines::after { content: ""; position: absolute; right: 17%; top: 25%; width: 16px; aspect-ratio: 1; border-radius: 50%; background: var(--lime); box-shadow: 0 0 20px #dff484a0; }
+.panel { margin-top: 20px; border: 1px solid var(--line); border-radius: 20px; background: var(--sheet); padding: clamp(18px, 3vw, 30px); }
+h2 { margin: 0 0 15px; font-size: 1.26rem; }
+.fields, .results { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 17px; }
+.field { min-width: 0; }
+.field > label:first-child { display: block; margin: 0 0 6px; font-size: .97rem; font-weight: 750; }
+input[type=number], select { display: block; width: 100%; min-height: 49px; padding: 9px 12px; border: 1px solid #9fb4af; border-radius: 9px; color: var(--ink); background: #fcfefd; font: inherit; }
+input[type=number]:disabled { background: var(--soft); color: var(--subtle); border-color: var(--line); }
+select { appearance: none; padding-right: 34px; }
+.select-wrap { position: relative; }
+.select-wrap::after { content: ""; width: .48rem; height: .48rem; border-right: 2px solid var(--teal); border-bottom: 2px solid var(--teal); transform: rotate(45deg); position: absolute; pointer-events: none; right: 16px; top: 20px; }
+.limit { display: inline-flex; align-items: center; gap: 8px; margin: 8px 0 0; cursor: pointer; color: var(--subtle); font-size: .94rem; }
+input[type=checkbox] { width: 18px; height: 18px; margin: 0; accent-color: var(--teal); }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+[aria-invalid=true] { border-color: #ab3030 !important; }
+.error { margin: 12px 0 0; color: #9d2929; font-weight: 650; }
+.error[hidden] { display: none; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 17px; padding-top: 13px; border-top: 1px solid var(--line); color: var(--subtle); }
+.facts b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.results { margin-top: 19px; }
+.result { min-width: 0; padding: clamp(16px, 3vw, 25px); border-radius: 17px; border: 1px solid var(--line); background: var(--sheet); }
+.result h2 { margin: 0; font-size: 1.11rem; }
+.result p { margin: 4px 0 0; color: var(--subtle); font-size: .91rem; }
+.result .number { display: block; margin-top: 14px; color: var(--teal); font-size: clamp(2.1rem, 4.6vw, 3.8rem); line-height: 1.1; font-weight: 790; letter-spacing: -.045em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.unit { margin: 8px 0 17px !important; }
+.track { height: 6px; margin-bottom: 13px; overflow: hidden; border-radius: 20px; background: #eaf1ef; }
+.track span { display: block; width: 0; height: 100%; border-radius: 20px; background: var(--teal); }
+.result:nth-child(2) .track span { background: #495b90; }
+.result:nth-child(3) .track span { background: #758918; }
+.comparison h2 { margin-bottom: 5px; }
+.comparison p { margin: 0 0 12px; color: var(--subtle); font-size: .94rem; }
+.comparison .comparison-note { margin: 12px 0 0; }
+.comparison .compact { display: none; }
+.comparison-scroll { max-height: 26rem; overflow: auto; border: 1px solid var(--line); border-radius: 11px; }
+.comparison table { width: 100%; min-width: 300px; border-collapse: separate; border-spacing: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.comparison th, .comparison td { padding: 8px clamp(8px, 2vw, 21px); }
+.comparison thead th { position: sticky; top: 0; background: var(--dark); color: white; font-size: .92rem; z-index: 1; }
+.comparison th:first-child { text-align: left; }
+.comparison tbody th, .comparison tbody td { border-bottom: 1px solid var(--line); }
+.comparison tbody tr:last-child > * { border-bottom: 0; }
+.comparison tbody tr:nth-child(even) { background: var(--soft); }
+.comparison tbody tr.selected { background: #dff0e5; color: #0b5447; font-weight: 750; }
+.comparison tbody tr.selected th { box-shadow: inset 3px 0 var(--teal); }
+@media (max-width: 480px) {
+  .comparison table { min-width: 0; table-layout: fixed; }
+  .comparison thead th { font-size: .81rem; }
+  .comparison th, .comparison td { padding-inline: 6px; }
+  .comparison .wide { display: none; }
+  .comparison .compact { display: inline; }
+}
+details { margin-top: 20px; border: 1px solid var(--line); background: var(--sheet); border-radius: 16px; }
+summary { cursor: pointer; padding: 16px 20px; font-weight: 725; }
+.notes { padding: 0 20px 18px; }
+.notes p { max-width: 77ch; margin: 0 0 9px; }
+footer { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 19px 0 0; padding: 0 4px; }
+a { color: #075b4d; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+@media (max-width: 700px) {
+  main { padding: 15px; }
+  .lines { opacity: .27; width: 50%; }
+  .fields { grid-template-columns: minmax(0, 1fr); gap: 13px; }
+  .results { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .result .number { font-size: 2.55rem; }
+  .result { padding: 15px 18px; }
+}
+.bracket { margin-top: 20px; }
+.bracket-heading { display: flex; justify-content: space-between; gap: 15px 26px; flex-wrap: wrap; align-items: end; margin-bottom: 15px; }
+.bracket-heading h2 { margin-bottom: 4px; }
+.bracket-heading p { margin: 0; color: var(--subtle); font-size: .94rem; }
+.bracket-controls { display: flex; align-items: end; gap: 9px; flex-wrap: wrap; flex: 0 1 27rem; }
+.bracket-picker { flex: 1 1 15rem; }
+.bracket-fullscreen { min-height: 49px; padding: 9px 13px; border: 1px solid var(--teal); border-radius: 9px; background: var(--soft); color: var(--teal); font: inherit; font-weight: 700; cursor: pointer; }
+.bracket-fullscreen:hover { background: #e1eee8; }
+.bracket.is-expanded { display: flex; flex-direction: column; margin: 0; border: 0; border-radius: 0; padding: 0 clamp(12px, 2vw, 26px) 12px; overflow: hidden; }
+.bracket.is-expanded .bracket-heading { flex: none; padding: 12px 0; margin-bottom: 0; }
+.bracket.is-expanded .bracket-scroll { flex: 1 1 auto; min-height: 0; max-height: none; }
+.bracket-overlay { position: fixed; inset: 0; z-index: 5; }
+.bracket-overlay-open { overflow: hidden; }
+.bracket-picker label { display: block; font-weight: 700; font-size: .93rem; margin-bottom: 5px; }
+.bracket-scroll { position: relative; overflow: auto; max-height: 37rem; border: 1px solid var(--line); border-radius: 12px; background: #f7faf9; }
+.bracket-board { position: relative; isolation: isolate; }
+.placement-link { display: inline-block; margin-top: 4px; font-size: .88rem; font-weight: 650; }
+.placement-link[hidden] { display: none; }
+.placement-brackets { margin: 18px 12px 12px; }
+.placement-brackets h3 { margin: 0 0 12px; }
+.placement-boards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 14px; }
+.placement-board-section { min-width: 0; }
+.placement-board-section.wide { grid-column: 1 / -1; }
+.placement-board-section h4 { margin: 0 0 5px; font-size: .94rem; }
+.placement-board-section .bracket-stage { top: 7px; }
+.bracket-lane { position: absolute; inset-inline: 5px; border-radius: 8px; background: #edf5f1; }
+.bracket-lane.bronze { background: #edf0f9; }
+.bracket-lane.places { background: #f0f5e8; }
+.bracket-lane-label { position: absolute; top: 5px; left: 11px; font-size: .83rem; font-weight: 750; color: var(--subtle); }
+.bracket-stage, .bracket-range { border-radius: 5px; font-variant-numeric: tabular-nums; }
+.bracket-stage { position: absolute; top: 27px; padding: 3px 8px; text-align: center; color: #08554a; background: #dcece6; font-size: .83rem; font-weight: 750; }
+.bracket-lines { position: absolute; inset: 0; pointer-events: none; }
+.bracket-lines path { fill: none; stroke: #659489; stroke-width: 1.1; }
+.bracket-card { width: 177px; height: 79px; position: absolute; padding: 6px 8px; border: 1px solid #b7ccc7; border-left: 4px solid var(--teal); border-radius: 7px; background: #fff; }
+.bracket-card.bronze { border-left-color: #495b90; }
+.bracket-card.places { border-left-color: #758918; }
+.bracket-id { display: flex; align-items: center; justify-content: space-between; gap: 5px; min-height: 19px; color: var(--subtle); font-size: .78rem; margin-bottom: 2px; }
+.bracket-range { padding: 1px 6px; color: #435713; background: #eaf0da; font-size: .75rem; line-height: 15px; }
+.bracket-card.bronze .bracket-range { color: #394981; background: #e5e9f6; }
+.bracket-side { display: block; text-align: left; width: 100%; padding: 0; border: 0; background: none; color: var(--ink); font: 600 .79rem/20px "Noto Sans", "Segoe UI", system-ui, sans-serif; }
+button.bracket-side { text-decoration: underline; text-underline-offset: 2px; color: var(--teal); cursor: pointer; }
+button.bracket-side:hover { text-decoration-thickness: 2px; }
+.bracket-card:focus { outline: 3px solid var(--focus); outline-offset: 2px; z-index: 2; }
+.formula-notes h3 { margin: 16px 0 7px; font-size: 1.04rem; }
+.formula-notes p { margin-bottom: 8px; }
+.formula-box { margin: 8px 0; padding: 12px 15px; overflow-x: auto; border-radius: 9px; background: var(--soft); }
+.formula-box math { font: 1.18rem "Cambria Math", math; width: max-content; margin-inline: 0; }
+@media (max-width: 480px) {
+  .bracket-picker { flex: 1 1 100%; }
+  .bracket-scroll { max-height: 29rem; }
+  .formula-box math { font-size: 1.03rem; }
+  .formula-box { padding-inline: 9px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="lines" aria-hidden="true"></div>
+    <p class="kicker">Настольный теннис · RTTF</p>
+    <h1>Калькулятор<br>турнирных сеток</h1>
+    <p class="intro">Сравните число матчей по приложениям 11 и 12 А и в смешанной сетке.</p>
+  </header>
+
+  <section class="panel" aria-labelledby="parameters">
+    <h2 id="parameters">Параметры турнира</h2>
+    <div class="fields">
+      <div class="field">
+        <label for="size">Участников</label>
+        <input id="size" type="number" min="1" step="1" value="17" inputmode="numeric" aria-describedby="size-help">
+        <span id="size-help" class="limit">В парном турнире укажите число пар.</span>
+      </div>
+      <div class="field">
+        <label for="losses">Лимит поражений</label>
+        <input id="losses" type="number" min="1" step="1" value="2" inputmode="numeric">
+        <label class="limit"><input id="unlimited" type="checkbox"> Без лимита поражений</label>
+      </div>
+      <div class="field">
+        <label for="stage">Длинная часть смешанной сетки</label>
+        <div class="select-wrap"><select id="stage" aria-describedby="stage-help"></select></div>
+        <span id="stage-help" class="limit">Раунд, с которого включается длинная схема.</span>
+      </div>
+    </div>
+    <p id="error" class="error" role="status" hidden></p>
+    <div class="facts" aria-label="Первый круг">
+      <span>Мест в сетке <b id="slots">—</b></span>
+      <span>Проходов без игры <b id="byes">—</b></span>
+      <span>Матчей в первом круге <b id="opening">—</b></span>
+    </div>
+  </section>
+
+  <section class="results" aria-label="Сравнение числа матчей" aria-live="polite">
+    <article class="result">
+      <h2>Короткая сетка</h2>
+      <p>Приложение 11</p>
+      <output id="short" class="number" for="size losses unlimited">—</output>
+      <p class="unit">Матчей</p>
+      <div class="track" aria-hidden="true"><span id="short-track"></span></div>
+      <p id="short-reference"></p>
+    </article>
+    <article class="result">
+      <h2>Длинная сетка</h2>
+      <p>Приложение 12 А</p>
+      <output id="long" class="number" for="size losses unlimited">—</output>
+      <p class="unit">Матчей</p>
+      <div class="track" aria-hidden="true"><span id="long-track"></span></div>
+      <p id="long-reference"></p>
+    </article>
+    <article class="result">
+      <h2>Смешанная сетка</h2>
+      <p id="mixed-stage">С четвертьфинала</p>
+      <output id="mixed" class="number" for="size losses unlimited stage">—</output>
+      <p class="unit">Матчей</p>
+      <div class="track" aria-hidden="true"><span id="mixed-track"></span></div>
+      <p id="mixed-reference"></p>
+    </article>
+  </section>
+
+  <section id="bracket-panel" class="panel bracket" aria-labelledby="bracket-heading">
+    <div class="bracket-heading">
+      <div>
+        <h2 id="bracket-heading">Турнирная сетка</h2>
+        <p id="bracket-status" role="status"></p>
+        <a id="placement-link" class="placement-link" href="#placement-brackets" hidden>Перейти к сеткам за места</a>
+      </div>
+      <div class="bracket-controls">
+        <div class="bracket-picker">
+          <label for="bracket-variant">Вариант сетки</label>
+          <div class="select-wrap"><select id="bracket-variant">
+            <option value="short">Короткая · приложение 11</option>
+            <option value="long">Длинная · приложение 12 А</option>
+            <option value="mixed">Смешанная</option>
+          </select></div>
+        </div>
+        <button type="button" class="bracket-fullscreen" id="bracket-fullscreen" aria-controls="bracket-panel">На весь экран</button>
+      </div>
+    </div>
+    <div class="bracket-scroll" id="bracket-scroll" role="region" tabindex="0" aria-labelledby="bracket-heading">
+      <div id="bracket-board" class="bracket-board" role="group" aria-label="Матчи и переходы"></div>
+      <section id="placement-brackets" class="placement-brackets" aria-labelledby="placement-brackets-heading" hidden>
+        <h3 id="placement-brackets-heading">Отдельные сетки за места</h3>
+        <div id="placement-boards" class="placement-boards"></div>
+      </section>
+    </div>
+  </section>
+
+  <section class="panel comparison" aria-labelledby="comparison-heading">
+    <h2 id="comparison-heading">Матчи для 4–64 участников</h2>
+    <p id="comparison-settings" role="status"></p>
+    <div class="comparison-scroll" role="region" tabindex="0" aria-labelledby="comparison-heading">
+      <table aria-labelledby="comparison-heading" aria-describedby="comparison-settings comparison-note">
+        <thead>
+          <tr>
+            <th scope="col" aria-label="Участников"><span class="wide">Участников</span><span class="compact">Участн.</span></th>
+            <th scope="col" aria-label="Короткая сетка, приложение 11"><span class="wide">Приложение 11</span><span class="compact">Прил. 11</span></th>
+            <th scope="col" aria-label="Длинная сетка, приложение 12 А"><span class="wide">Приложение 12 А</span><span class="compact">Прил. 12 А</span></th>
+            <th scope="col" aria-label="Смешанная сетка"><span class="wide">Смешанная</span><span class="compact">Смешан.</span></th>
+          </tr>
+        </thead>
+        <tbody id="comparison-rows"></tbody>
+      </table>
+    </div>
+    <p class="comparison-note" id="comparison-note">Если выбранного раунда в сетке нет, длинная часть начинается с первого круга.</p>
+  </section>
+
+  <details id="math-formulas">
+    <summary>Математическая запись формул</summary>
+    <div class="notes formula-notes">
+      <p><b>N</b> — число участников, <b>P</b> — лимит поражений, <b>t</b> — число туров длинной части, считая от финала. В парном турнире N равно числу пар.</p>
+      <div class="formula-box">
+        <math display="block" aria-label="Размер сетки и параметры длинной схемы">
+          <mtable columnalign="left left" columnspacing="1.45em" rowspacing=".65em">
+            <mtr>
+              <mtd><mi>k</mi><mo>=</mo><mo>⌈</mo><msub><mi>log</mi><mn>2</mn></msub><mi>N</mi><mo>⌉</mo></mtd>
+              <mtd><mi>S</mi><mo>=</mo><msup><mn>2</mn><mi>k</mi></msup></mtd>
+            </mtr>
+            <mtr>
+              <mtd><mi>q</mi><mo>=</mo><mi>N</mi><mo>−</mo><msup><mn>2</mn><mrow><mi>k</mi><mo>−</mo><mn>1</mn></mrow></msup></mtd>
+              <mtd><mi>R</mi><mo>=</mo><msup><mn>2</mn><mrow><mi>k</mi><mo>−</mo><mn>2</mn></mrow></msup></mtd>
+            </mtr>
+            <mtr>
+              <mtd><mi>a</mi><mo>=</mo><mi>max</mi><mo stretchy="false">(</mo><mn>0</mn><mo>,</mo><mi>q</mi><mo>−</mo><mi>R</mi><mo stretchy="false">)</mo></mtd>
+              <mtd><mi>b</mi><mo>=</mo><mi>min</mi><mo stretchy="false">(</mo><mi>q</mi><mo>,</mo><mi>R</mi><mo stretchy="false">)</mo></mtd>
+            </mtr>
+          </mtable>
+        </math>
+      </div>
+      <h3>Короткая сетка · приложение 11</h3>
+      <div class="formula-box">
+        <math display="block" aria-label="Формула короткой сетки">
+          <mtable columnalign="left" rowspacing=".7em">
+            <mtr><mtd>
+              <mi>F</mi><mo stretchy="false">(</mo><mi>n</mi><mo>,</mo><mi>p</mi><mo stretchy="false">)</mo><mo>=</mo>
+              <munderover><mo>∑</mo><mrow><mi>x</mi><mo>=</mo><mn>0</mn></mrow><mrow><mi>n</mi><mo>−</mo><mn>1</mn></mrow></munderover>
+              <mi>min</mi><mo>{</mo><mi>p</mi><mo>,</mo><msub><mi>w</mi><mn>2</mn></msub><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo>}</mo>
+            </mtd></mtr>
+            <mtr><mtd>
+              <msub><mi>M</mi><mn>11</mn></msub><mo stretchy="false">(</mo><mi>N</mi><mo>,</mo><mi>P</mi><mo stretchy="false">)</mo>
+              <mo>=</mo><mi>F</mi><mo stretchy="false">(</mo><mi>N</mi><mo>,</mo><mi>P</mi><mo stretchy="false">)</mo>
+            </mtd></mtr>
+          </mtable>
+        </math>
+      </div>
+      <p><b>w₂(x)</b> — число единиц в двоичной записи x. При n = 0 сумма пуста, а F(n, 0) = 0.</p>
+      <h3>Длинная сетка · приложение 12 А</h3>
+      <div class="formula-box">
+        <math display="block" aria-label="Формула длинной сетки для одного поражения и для двух и более">
+          <mtable rowspacing=".55em">
+            <mtr><mtd>
+              <msub><mi>M</mi><mn>12</mn></msub><mo stretchy="false">(</mo><mi>N</mi><mo>,</mo><mi>P</mi><mo stretchy="false">)</mo><mo>=</mo>
+            </mtd></mtr>
+            <mtr><mtd><mrow>
+            <mo stretchy="true">{</mo>
+            <mtable columnalign="left left" columnspacing="1em" rowspacing=".6em">
+              <mtr>
+                <mtd><mi>N</mi><mo>−</mo><mn>1</mn><mo>,</mo></mtd>
+                <mtd><mi>P</mi><mo>=</mo><mn>1</mn></mtd>
+              </mtr>
+              <mtr>
+                <mtd>
+                  <mtable columnalign="left" rowspacing=".34em">
+                    <mtr><mtd>
+                      <mn>2</mn><mi>N</mi><mo>−</mo><mn>4</mn><mo>+</mo>
+                      <mi>F</mi><mo stretchy="false">(</mo><mi>a</mi><mo>,</mo><mi>P</mi><mo>−</mo><mn>2</mn><mo stretchy="false">)</mo>
+                    </mtd></mtr>
+                    <mtr><mtd>
+                      <mo>+</mo><mi>F</mi><mo stretchy="false">(</mo><mi>b</mi><mo>,</mo><mi>P</mi><mo>−</mo><mn>2</mn><mo stretchy="false">)</mo>
+                    </mtd></mtr>
+                    <mtr><mtd>
+                      <mo>+</mo><mn>2</mn><munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mrow><mi>k</mi><mo>−</mo><mn>3</mn></mrow></munderover>
+                      <mi>F</mi><mo stretchy="false">(</mo><msup><mn>2</mn><mi>j</mi></msup><mo>,</mo><mi>P</mi><mo>−</mo><mn>2</mn><mo stretchy="false">)</mo><mo>,</mo>
+                    </mtd></mtr>
+                  </mtable>
+                </mtd>
+                <mtd><mi>P</mi><mo>≥</mo><mn>2</mn></mtd>
+              </mtr>
+            </mtable>
+            </mrow></mtd></mtr>
+          </mtable>
+        </math>
+      </div>
+      <p>Формула длинной сетки записана для N ≥ 3. При k &lt; 4 сумма по j равна нулю.</p>
+      <h3>Смешанная сетка</h3>
+      <div class="formula-box">
+        <math display="block" aria-label="Формула смешанной сетки">
+          <mtable columnalign="left" rowspacing=".7em">
+            <mtr><mtd>
+              <mi>B</mi><mo>=</mo><mi>min</mi><mo stretchy="false">(</mo><mi>N</mi><mo>,</mo><msup><mn>2</mn><mi>t</mi></msup><mo stretchy="false">)</mo>
+            </mtd></mtr>
+            <mtr><mtd>
+              <msub><mi>M</mi><mtext>mix</mtext></msub><mo stretchy="false">(</mo><mi>N</mi><mo>,</mo><mi>P</mi><mo>,</mo><mi>t</mi><mo stretchy="false">)</mo>
+              <mo>=</mo>
+            </mtd></mtr>
+            <mtr><mtd>
+              <mi>F</mi><mo stretchy="false">(</mo><mi>N</mi><mo>,</mo><mi>P</mi><mo stretchy="false">)</mo><mo>−</mo>
+              <mi>F</mi><mo stretchy="false">(</mo><mi>B</mi><mo>,</mo><mi>P</mi><mo stretchy="false">)</mo><mo>+</mo>
+              <msub><mi>M</mi><mn>12</mn></msub><mo stretchy="false">(</mo><mi>B</mi><mo>,</mo><mi>P</mi><mo stretchy="false">)</mo>
+            </mtd></mtr>
+          </mtable>
+        </math>
+      </div>
+      <p>Допустимо 1 ≤ t ≤ k. Для полного розыгрыша мест можно взять P = k. Для одного участника результат 0, для двух — 1 матч.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>Как учитываются свободные места</summary>
+    <div class="notes">
+      <p>Калькулятор использует зеркальный посев на ближайшую степень двойки. В первом туре номера соперников дополняют друг друга до числа мест плюс один. Проходы без игры получают первые номера посева.</p>
+      <p>Когда в ячейке один участник, он проходит в ветку победителя без матча и поражения. Групповой этап, технические результаты и снятия считаются по фактическому протоколу отдельно.</p>
+      <p>Для конкретного турнира со специальным шаблоном или другой раскладкой свободных мест ориентируйтесь на его протокол. <a href="https://rttf.ru/content/62">Схемы RTTF</a> · <a href="https://rttf.ru/content/63">Правило выбывания</a></p>
+    </div>
+  </details>
+  <footer>
+    <a href="Формулы турнирных сеток RTTF.pdf">Формулы и таблицы в PDF</a>
+    <a href="Формулы турнирных сеток RTTF.md">Версия в Markdown</a>
+  </footer>
+  <noscript>Для расчёта включите JavaScript в браузере.</noscript>
+</main>
+<script id="formula-engine">
+"use strict";
+
+function rounds(n) {
+  return n <= 1n ? 0 : (n - 1n).toString(2).length;
+}
+
+// A 1 in n starts a block below n with a fixed binary prefix and every suffix.
+function shortMatches(n, limit) {
+  if (n === 0n || limit <= 0) return 0n;
+  const binary = n.toString(2);
+  let prefixOnes = 0;
+  let matches = 0n;
+  for (let index = 0; index < binary.length; index++) {
+    if (binary[index] !== "1") continue;
+    const suffixLength = binary.length - index - 1;
+    let combinations = 1n;
+    for (let ones = 0; ones <= suffixLength; ones++) {
+      matches += combinations * BigInt(Math.min(limit, prefixOnes + ones));
+      if (ones < suffixLength) {
+        combinations = combinations * BigInt(suffixLength - ones) / BigInt(ones + 1);
+      }
+    }
+    prefixOnes++;
+  }
+  return matches;
+}
+
+function longMatches(n, limit) {
+  if (n <= 2n || limit === 1) return n - 1n;
+  const k = rounds(n);
+  const firstRound = n - (1n << BigInt(k - 1));
+  const quarter = 1n << BigInt(k - 2);
+  const firstPool = firstRound > quarter ? firstRound - quarter : 0n;
+  const secondPool = firstRound < quarter ? firstRound : quarter;
+  const remaining = limit - 2;
+  let matches = 2n * n - 4n + shortMatches(firstPool, remaining) + shortMatches(secondPool, remaining);
+  for (let j = 1; j <= k - 3; j++) {
+    matches += 2n * shortMatches(1n << BigInt(j), remaining);
+  }
+  return matches;
+}
+
+function calculate(n, limit, t) {
+  const startSize = 1n << BigInt(t);
+  const block = startSize < n ? startSize : n;
+  const short = shortMatches(n, limit);
+  return {
+    short,
+    long: longMatches(n, limit),
+    mixed: short - shortMatches(block, limit) + longMatches(block, limit)
+  };
+}
+</script>
+<script id="bracket-engine">
+"use strict";
+
+const MAX_BRACKET_PLAYERS = 256;
+
+function buildBracket(n, limit, t, variant) {
+  const matches = [];
+  const placements = [];
+
+  let ranking = [1];
+  while (ranking.length < n) {
+    const opposite = ranking.length * 2 + 1;
+    ranking = ranking.flatMap((seed, index) => index % 2 === 0 ? [seed, opposite - seed] : [opposite - seed, seed]);
+  }
+  const entries = ranking.map(seed => seed <= n ? {seed, losses: 0} : null);
+
+  function match(left, right, group, step, places) {
+    if (left === null || right === null) return [left ?? right, null];
+    // Every real fixture in these three seeded formats joins entrants with the
+    // same prior loss count. Thus the graph is independent of who wins.
+    if (left.losses !== right.losses) throw new Error("Неодинаковое число поражений перед встречей");
+    const column = Math.max(step,
+                            (left.column ?? -2) + 1, (right.column ?? -2) + 1);
+    const id = matches.length + 1;
+    matches.push({id, group, column, places, sides: [left, right]});
+    const winner = {id, column, losses: left.losses, won: true};
+    const losses = left.losses + 1;
+    const loser = losses < limit ? {id, column, losses, won: false} : null;
+    return [winner, loser];
+  }
+
+  function round(slots, group, step, firstPlace, lastPlace = firstPlace + slots.length - 1) {
+    const winners = [];
+    const losers = [];
+    const places = [firstPlace, lastPlace];
+    for (let i = 0; i < slots.length; i += 2) {
+      const [winner, loser] = match(slots[i], slots[i + 1], group, step, places);
+      winners.push(winner);
+      losers.push(loser);
+    }
+    return {winners, losers};
+  }
+
+  function short(slots, group, step, firstPlace) {
+    if (slots.filter(Boolean).length < 2) return;
+    const {winners, losers} = round(slots, group, step, firstPlace);
+    short(winners, group, step + 1, firstPlace);
+    short(losers, "places", step + 1, firstPlace + winners.length);
+  }
+
+  function long(slots, step) {
+    const upperLosses = [];
+    let lastPlace = slots.length;
+    while (slots.length > 1) {
+      const result = round(slots, "main", step + upperLosses.length, 1);
+      upperLosses.push(result.losers);
+      slots = result.winners;
+    }
+    if (upperLosses.length < 2 || limit === 1) return;
+
+    // Use the slot range even when byes leave some places vacant.
+    function addPlacementPool(pool, poolStep) {
+      lastPlace -= pool.length;
+      placements.push({slots: pool, step: poolStep, firstPlace: lastPlace + 1});
+    }
+
+    let lower = upperLosses[0];
+    let lowerStep = step + 1;
+    for (const newEntries of upperLosses.slice(1, -1)) {
+      const first = round(lower, "bronze", lowerStep++, 3, lastPlace);
+      addPlacementPool(first.losers, lowerStep);
+      const places = [3, lastPlace];
+      const joined = first.winners.map((entrant, index) =>
+        match(entrant, newEntries.at(-1-index), "bronze", lowerStep, places));
+      lower = joined.map(pair => pair[0]);
+      addPlacementPool(joined.map(pair => pair[1]), ++lowerStep);
+    }
+    round(lower, "bronze", lowerStep, 3, lastPlace);
+  }
+
+  function mixed(slots, step) {
+    if (slots.length <= 2 ** t) {
+      long(slots, step);
+      return;
+    }
+    const {winners, losers} = round(slots, "main", step, 1);
+    mixed(winners, step + 1);
+    placements.push({slots: losers, step: step + 1, firstPlace: winners.length + 1});
+  }
+
+  if (variant === "short") short(entries, "main", 0, 1);
+  if (variant === "long") long(entries, 0);
+  if (variant === "mixed") mixed(entries, 0);
+  for (const pool of placements) short(pool.slots, "places", pool.step, pool.firstPlace);
+
+  const columns = [...new Set(matches.map(row => row.column))].sort((a,b) => a-b);
+  const columnIndex = new Map(columns.map((old, index) => [old,index]));
+  return matches.map(row => ({...row, column:columnIndex.get(row.column)}));
+}
+</script>
+<script>
+"use strict";
+
+const get = id => document.getElementById(id);
+const nField = get("size");
+const pField = get("losses");
+const unlimited = get("unlimited");
+const stage = get("stage");
+const error = get("error");
+const format = new Intl.NumberFormat("ru-RU");
+const variants = ["short", "long", "mixed"];
+const comparisonRows = Array.from({length: 61}, (_, index) => {
+  const n = index + 4;
+  const row = get("comparison-rows").insertRow();
+  const label = document.createElement("th");
+  label.scope = "row";
+  label.textContent = String(n);
+  row.append(label);
+  return {n, row, cells: variants.map(() => row.insertCell())};
+});
+let preferredStage = 3;
+
+function stageName(t) {
+  if (t === 1) return "С финала";
+  if (t === 2) return "С полуфинала";
+  if (t === 3) return "С четвертьфинала";
+  return "С 1/" + format.format(2 ** (t - 1)) + " финала";
+}
+
+function refreshStages(k) {
+  const last = Math.max(rounds(64n), k);
+  if (stage.options.length !== last) {
+    stage.replaceChildren();
+    for (let t = 1; t <= last; t++) stage.add(new Option(stageName(t), String(t)));
+  }
+  stage.value = String(Math.min(preferredStage, last));
+}
+
+function updateComparison(selected, limit, t, validLimit) {
+  const settings = get("comparison-settings");
+  if (!validLimit) {
+    settings.textContent = "Введите положительное целое число поражений, чтобы пересчитать таблицу.";
+  } else {
+    const limitLabel = unlimited.checked ? "Без лимита поражений" : "Лимит поражений — " + format.format(limit);
+    settings.textContent = limitLabel + " · смешанная сетка " + stageName(t).toLowerCase();
+  }
+  for (const {n, row, cells} of comparisonRows) {
+    row.classList.toggle("selected", n === selected);
+    const count = BigInt(n);
+    const k = rounds(count);
+    const result = validLimit ? calculate(count, unlimited.checked ? k : Math.min(k, limit), t) : null;
+    for (let i = 0; i < variants.length; i++) {
+      cells[i].textContent = result ? format.format(result[variants[i]]) : "—";
+    }
+  }
+}
+
+function update() {
+  const n = nField.valueAsNumber;
+  const p = pField.valueAsNumber;
+  const validN = Number.isSafeInteger(n) && n >= 1;
+  const validP = unlimited.checked || (Number.isSafeInteger(p) && p >= 1);
+  nField.setAttribute("aria-invalid", String(!validN));
+  pField.setAttribute("aria-invalid", String(!validP));
+  pField.disabled = unlimited.checked;
+  error.hidden = validN && validP;
+  error.textContent = !validN ? "Введите положительное целое число участников." :
+    !validP ? "Введите положительное целое число поражений." : "";
+  const count = validN ? BigInt(n) : 0n;
+  const k = rounds(count);
+  refreshStages(k);
+  const t = Number(stage.value);
+  updateComparison(n, p, t, validP);
+
+  if (!validN || !validP) {
+    updateBracket(0, 0, t);
+    for (const id of ["slots", "byes", "opening", ...variants]) get(id).textContent = "—";
+    for (const key of variants) {
+      get(key + "-track").style.width = "0%";
+      get(key + "-reference").textContent = "";
+    }
+    return;
+  }
+
+  const slots = 1n << BigInt(k);
+  const fullLimit = Math.max(1, k);
+  const limit = unlimited.checked ? fullLimit : Math.min(p, fullLimit);
+  const result = calculate(count, limit, t);
+  const full = calculate(count, fullLimit, t);
+  updateBracket(n, limit, t);
+  const total = variants.reduce((maximum, key) => result[key] > maximum ? result[key] : maximum, 0n);
+
+  get("slots").textContent = format.format(slots);
+  get("byes").textContent = format.format(slots - count);
+  get("opening").textContent = format.format(k === 0 ? 0n : count - slots / 2n);
+  get("mixed-stage").textContent = k === 0 ? "Один участник" : t > k ? "С первого круга" : stageName(t);
+  for (const key of variants) {
+    get(key).textContent = format.format(result[key]);
+    get(key + "-track").style.width = total === 0n ? "0%" : String(result[key] * 100n / total) + "%";
+    const saved = full[key] - result[key];
+    get(key + "-reference").textContent = unlimited.checked ? "Полный розыгрыш мест" :
+      "Без лимита " + format.format(full[key]) + (saved > 0n ? " · экономия " + format.format(saved) : "");
+  }
+}
+
+nField.addEventListener("input", update);
+pField.addEventListener("input", update);
+unlimited.addEventListener("change", update);
+stage.addEventListener("change", () => {
+  preferredStage = Number(stage.value);
+  update();
+});
+
+"use strict";
+
+const bracketPanel = get("bracket-panel");
+const fullscreenButton = get("bracket-fullscreen");
+const bracketVariant = get("bracket-variant");
+const bracketBoard = get("bracket-board");
+const bracketScroll = get("bracket-scroll");
+const bracketStatus = get("bracket-status");
+const placementLink = get("placement-link");
+const placementBrackets = get("placement-brackets");
+const placementBoards = get("placement-boards");
+const BRACKET_GROUPS = [
+  ["main", "Основная ветка", ([, size]) => size === 2 ? "Финал" : "1/" + size / 2],
+  ["bronze", "Ветка за бронзу"],
+  ["places", "Матчи за места"]
+];
+
+function bracketCard(match) {
+  const card = document.createElement("article");
+  card.className = "bracket-card " + match.group;
+  card.id = "bracket-match-" + match.id;
+  card.tabIndex = -1;
+
+  const title = document.createElement("strong");
+  title.className = "bracket-id";
+  title.textContent = "Матч " + match.id;
+  if (match.group !== "main") {
+    const [first, last] = match.places;
+    const range = document.createElement("span");
+    range.className = "bracket-range";
+    range.textContent = first + ".." + last;
+    range.title = "Борьба за места " + first + "–" + last;
+    title.append(range);
+  }
+  card.append(title);
+
+  for (const entry of match.sides) {
+    const line = document.createElement(entry.seed ? "span" : "button");
+    line.className = "bracket-side";
+    if (entry.seed) {
+      line.textContent = "Посев № " + entry.seed;
+    } else {
+      line.type = "button";
+      line.dataset.sourceMatch = String(entry.id);
+      line.textContent = (entry.won ? "Победитель " : "Проигравший ") + "№ " + entry.id;
+      line.title = "Перейти к матчу " + entry.id;
+    }
+    card.append(line);
+  }
+  return card;
+}
+
+function arrangeBracket(matches, groups) {
+  const card = {width: 177, height: 79, gap: 49, pitch: 92};
+  const padding = 17;
+  const count = Math.max(...matches.map(match => match.column)) + 1;
+  const width = padding * 2 + card.width * count + card.gap * (count - 1);
+  const positions = new Map();
+  const bands = [];
+  let offsetY = 9;
+  for (const [group, label, stageLabel] of groups) {
+    const columns = Array.from({length: count}, () => []);
+    for (const match of matches) if (match.group === group) columns[match.column].push(match);
+    const rows = Math.max(...columns.map(column => column.length));
+    if (!rows) continue;
+
+    const headingSpace = stageLabel ? (label ? 57 : 36) : 32;
+    const bandHeight = rows * card.pitch + headingSpace + 4;
+    const stages = [];
+    bands.push({label, group, y: offsetY, height: bandHeight, stages});
+    for (let i = 0; i < count; i++) {
+      const column = columns[i];
+      if (!column.length) continue;
+      const x = padding + i * (card.width + card.gap);
+      if (stageLabel) stages.push({x, label: stageLabel(column[0].places)});
+      const distance = rows * card.pitch / column.length;
+      for (let j = 0; j < column.length; j++) {
+        positions.set(column[j].id, {
+          x,
+          y: offsetY + headingSpace + distance * (j + .5) - card.height / 2
+        });
+      }
+    }
+    offsetY += bandHeight + 9;
+  }
+  const opening = matches.filter(match => match.column === 0);
+  if (opening.length === 1) {
+    const first = opening[0];
+    const next = matches.find(match => match.group === first.group &&
+      match.sides.some(side => side.id === first.id && side.won));
+    if (next) positions.get(first.id).y = positions.get(next.id).y;
+  }
+  return {card, width, height: offsetY, positions, bands};
+}
+
+function drawBracket(board, matches, groups = BRACKET_GROUPS) {
+  const {card, width, height, positions, bands} = arrangeBracket(matches, groups);
+  board.style.width = width + "px";
+  board.style.height = height + "px";
+  const fragment = document.createDocumentFragment();
+  for (const band of bands) {
+    const layer = document.createElement("div");
+    layer.className = "bracket-lane " + band.group;
+    layer.style.top = band.y + "px";
+    layer.style.height = band.height + "px";
+    if (band.label) {
+      const label = document.createElement("span");
+      label.className = "bracket-lane-label";
+      label.textContent = band.label;
+      layer.append(label);
+    }
+    for (const stage of band.stages) {
+      const heading = document.createElement("span");
+      heading.className = "bracket-stage";
+      heading.style.left = stage.x - 5 + "px";
+      heading.style.width = card.width + "px";
+      heading.textContent = stage.label;
+      layer.append(heading);
+    }
+    fragment.append(layer);
+  }
+
+  const namespace = "http://www.w3.org/2000/svg";
+  const edges = document.createElementNS(namespace, "svg");
+  edges.setAttribute("class", "bracket-lines");
+  edges.setAttribute("width", String(width));
+  edges.setAttribute("height", String(height));
+  edges.setAttribute("aria-hidden", "true");
+  for (const match of matches) {
+    const to = positions.get(match.id);
+    for (const [index, source] of match.sides.entries()) {
+      if (!source.won) continue;
+      const from = positions.get(source.id);
+      if (!from) continue;
+      const x = from.x + card.width;
+      const y = from.y + card.height / 2;
+      const end = to.y + 39 + index * 20;
+      const middle = x + (to.x - x) / 2;
+      const edge = document.createElementNS(namespace, "path");
+      edge.setAttribute("d", "M " + x + " " + y + " C " + middle + " " + y + " " +
+                        middle + " " + end + " " + to.x + " " + end);
+      edges.append(edge);
+    }
+  }
+  fragment.append(edges);
+
+  for (const match of matches) {
+    const position = positions.get(match.id);
+    const element = bracketCard(match);
+    element.style.left = position.x + "px";
+    element.style.top = position.y + "px";
+    fragment.append(element);
+  }
+  board.replaceChildren(fragment);
+}
+
+function separatePlacementBranches(matches) {
+  const branches = new Map();
+  const branchByMatch = new Map();
+  for (const match of matches) {
+    if (match.group === "main") continue;
+    const [first, last] = match.places;
+    if (!branches.has(first)) {
+      branches.set(first, {first, stages: new Set(), children: new Set(), matches: []});
+    }
+    const branch = branches.get(first);
+    branch.stages.add(last);
+    branch.matches.push(match);
+    branchByMatch.set(match.id, branch);
+    for (const side of match.sides) {
+      const parent = branchByMatch.get(side.id);
+      if (parent && parent !== branch) parent.children.add(branch);
+    }
+  }
+
+  const separate = new Set([...branches.values()].filter(branch => branch.stages.size > 3));
+  // Move the dependent placement branches together with their source bracket.
+  for (const branch of separate) {
+    for (const child of branch.children) separate.add(child);
+  }
+  return [...separate].sort((a, b) => a.first - b.first);
+}
+
+function drawPlacementBoards(branches) {
+  placementBrackets.hidden = branches.length === 0;
+  placementLink.hidden = placementBrackets.hidden;
+  const fragment = document.createDocumentFragment();
+  for (const branch of branches) {
+    const stages = [...branch.stages].sort((a, b) => b - a);
+    const columnByStage = new Map(stages.map((last, index) => [last, index]));
+    const section = document.createElement("section");
+    section.className = "placement-board-section";
+    if (stages.length > 2) section.classList.add("wide");
+
+    const heading = document.createElement("h4");
+    heading.id = "placement-heading-" + branch.first;
+    heading.textContent = "Места " + branch.first + ".." + stages[0];
+    section.setAttribute("aria-labelledby", heading.id);
+    section.append(heading);
+
+    const board = document.createElement("div");
+    board.className = "bracket-board";
+    const localMatches = branch.matches.map(match => ({...match, column: columnByStage.get(match.places[1])}));
+    drawBracket(board, localMatches, [[localMatches[0].group, "", places => places.join("..")]]);
+    section.append(board);
+    fragment.append(section);
+  }
+  placementBoards.replaceChildren(fragment);
+}
+
+function updateBracket(n, limit, t) {
+  const variant = bracketVariant.value;
+  const valid = Number.isSafeInteger(n) && n >= 1 && Number.isInteger(limit) && limit >= 1;
+  if (!valid || n > MAX_BRACKET_PLAYERS || n === 1) {
+    bracketScroll.hidden = true;
+    bracketBoard.replaceChildren();
+    drawPlacementBoards([]);
+    if (!valid) bracketStatus.textContent = "Укажите число участников и лимит поражений в параметрах.";
+    else if (n === 1) bracketStatus.textContent = "Для одного участника матчей нет.";
+    else bracketStatus.textContent = "Схема доступна для групп до " + MAX_BRACKET_PLAYERS + " участников.";
+    return;
+  }
+  bracketScroll.hidden = false;
+  const matches = buildBracket(n, limit, t, variant);
+  const branches = separatePlacementBranches(matches);
+  const separateIds = new Set(branches.flatMap(branch => branch.matches.map(match => match.id)));
+  drawBracket(bracketBoard, matches.filter(match => !separateIds.has(match.id)));
+  drawPlacementBoards(branches);
+  bracketStatus.textContent = "Матчей на схеме — " + format.format(matches.length) +
+    (variant === "mixed" ? " · длинная часть " + stageName(Math.min(t, rounds(BigInt(n)))).toLowerCase() : "");
+}
+
+function syncFullscreenButton() {
+  const expanded = document.fullscreenElement === bracketPanel || bracketPanel.classList.contains("bracket-overlay");
+  bracketPanel.classList.toggle("is-expanded", expanded);
+  fullscreenButton.textContent = expanded ? "Свернуть" : "На весь экран";
+}
+
+function setBracketOverlay(open) {
+  bracketPanel.classList.toggle("bracket-overlay", open);
+  document.documentElement.classList.toggle("bracket-overlay-open", open);
+  for (const section of bracketPanel.parentElement.children) {
+    if (section !== bracketPanel) section.inert = open;
+  }
+  syncFullscreenButton();
+  fullscreenButton.focus({preventScroll: true});
+}
+
+fullscreenButton.addEventListener("click", async () => {
+  if (document.fullscreenElement === bracketPanel) {
+    await document.exitFullscreen();
+    return;
+  }
+  if (bracketPanel.classList.contains("bracket-overlay")) {
+    setBracketOverlay(false);
+    return;
+  }
+  if (document.fullscreenEnabled && bracketPanel.requestFullscreen) {
+    try {
+      await bracketPanel.requestFullscreen();
+      return;
+    } catch {
+      // Embedded pages may decline fullscreen even when the API is available.
+    }
+  }
+  setBracketOverlay(true);
+});
+
+document.addEventListener("fullscreenchange", syncFullscreenButton);
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && bracketPanel.classList.contains("bracket-overlay")) {
+    setBracketOverlay(false);
+  }
+});
+
+bracketPanel.addEventListener("click", event => {
+  const target = event.target.closest("button[data-source-match]");
+  if (!target) return;
+  const card = get("bracket-match-" + target.dataset.sourceMatch);
+  card.scrollIntoView({block: "nearest", inline: "nearest"});
+  card.focus({preventScroll: true});
+});
+placementLink.addEventListener("click", event => {
+  event.preventDefault();
+  bracketScroll.focus({preventScroll: true});
+  bracketScroll.scrollTo({top: placementBrackets.offsetTop, left: 0});
+});
+bracketVariant.addEventListener("change", update);
+
+update();
+</script>
+</body>
+</html>
+
